@@ -235,10 +235,10 @@ details.more[open] > summary { margin-bottom: 18px; }
         <div class="field">
           <div class="field-top">
             <label for="solar">Solar panel size</label>
-            <div class="num"><input id="solarNum" type="number" inputmode="numeric" min="200" max="3000" step="50" aria-label="Solar panel size in watts"><span>W</span></div>
+            <div class="num"><input id="solarNum" type="number" inputmode="numeric" min="200" max="3000" step="10" aria-label="Solar panel size in watts"><span>W</span></div>
           </div>
-          <div class="slider-row"><input id="solar" type="range" min="200" max="3000" step="50"></div>
-          <p class="hint">The total wattage printed on the panels. A typical balcony kit is 800 W.</p>
+          <div class="slider-row"><input id="solar" type="range" min="200" max="3000" step="10"></div>
+          <p class="hint">The total wattage printed on the panels. Pick a package above, or drag to try other sizes.</p>
         </div>
 
         <div class="field">
@@ -247,7 +247,7 @@ details.more[open] > summary { margin-bottom: 18px; }
             <div class="num"><input id="batteryNum" type="number" inputmode="numeric" min="0" max="5000" step="100" aria-label="Battery size in watt-hours"><span>Wh</span></div>
           </div>
           <div class="slider-row"><input id="battery" type="range" min="0" max="5000" step="100"></div>
-          <p class="hint">Set to 0 if there's no battery. A battery stores daytime sun for evening use.</p>
+          <p class="hint">Set to 0 if there's no battery. A battery stores daytime sun for evening use and adds about $0.75 per Wh to the price.</p>
         </div>
       </section>
 
@@ -274,7 +274,7 @@ details.more[open] > summary { margin-bottom: 18px; }
 
         <div class="field cost-box">
           <span class="label">What the system costs</span>
-          <div class="cost-auto"><span id="costAutoText">Typical price for this setup</span><strong id="costAuto">$0</strong></div>
+          <div class="cost-auto"><span id="costAutoText">Price for this setup</span><strong id="costAuto">$0</strong></div>
           <div class="field-top">
             <label for="customCost" class="hint" style="font-weight:500">Have a real price quote? Type it here instead:</label>
             <div class="num"><span>$</span><input id="customCost" type="number" inputmode="numeric" min="0" step="10" placeholder="—" aria-label="Your own system price in dollars"></div>
@@ -354,7 +354,7 @@ details.more[open] > summary { margin-bottom: 18px; }
         <li><strong>Yearly savings</strong> = power made per year × share used at home × your rate (plus the time-of-use bonus if it's on).</li>
         <li><strong>Payback</strong> = system cost ÷ first-year savings.</li>
         <li><strong>10- and 25-year profit</strong>: panels lose 0.5% of output per year, and electricity prices rise by the yearly increase you set, starting in year 2. Minus what the system cost.</li>
-        <li><strong>Typical price</strong> = $0.80 per watt of panels + $400 for the inverter, or + $0.75 per Wh of battery (battery systems include the inverter). No tax credit is applied.</li>
+        <li><strong>Price</strong>: the 580 W kit is $800 and the 1,180 W kit is $1,300. Other sizes on the slider are priced on a straight line between those two (about $0.83 per extra watt). A battery adds $0.75 per Wh. No tax credit is applied.</li>
         <li><strong>Backup value</strong> with a battery is an estimate of what riding out power outages is worth ($35 per outage hour covered). It's not bill savings, so it's shown separately.</li>
       </ul>
       <p>This is an estimate, not a quote. Battery replacement costs aren't included. Check your utility's and state's rules before installing. Formulas follow the calculator at pluginsolarus.com.</p>
@@ -370,18 +370,18 @@ details.more[open] > summary { margin-bottom: 18px; }
 <script>
 (function () {
   // ---------- Model (matches pluginsolarus.com/calculator) ----------
-  const PANEL_PER_W = 0.80, BATT_PER_WH = 0.75, INVERTER = 400, EFFICIENCY = 0.80, DEGRADATION = 0.005;
+  // Kit prices: 580 W = $800, 1,180 W = $1,300. Other sizes follow the straight line through those two points.
+  const KIT_A = [580, 800], KIT_B = [1180, 1300];
+  const PER_W = (KIT_B[1] - KIT_A[1]) / (KIT_B[0] - KIT_A[0]), BASE = KIT_A[1] - KIT_A[0] * PER_W;
+  const BATT_PER_WH = 0.75, EFFICIENCY = 0.80, DEGRADATION = 0.005;
   const OUTAGE_VALUE_PER_HR = 35, BACKUP_LOAD_W = 500;
   const SELF_USE = [[200,.98],[400,.95],[600,.85],[800,.75],[1200,.60],[1600,.50],[2000,.42],[2500,.36],[3000,.30]];
   const PSH = {AL:5,AK:2.1,AZ:7.5,AR:5,CA:6.3,CO:6,CT:4.7,DE:4.7,FL:5.5,GA:5,HI:5.8,ID:5,IL:4.6,IN:4.2,IA:4.2,KS:5.7,KY:4.5,LA:5,ME:4.2,MD:4.7,MA:4.7,MI:4.2,MN:4.4,MS:5,MO:5,MT:5,NE:5.5,NV:6.8,NH:4.3,NJ:4.3,NM:6.8,NY:4.3,NC:5,ND:5,OH:4.2,OK:5.7,OR:5,PA:4.5,RI:4.7,SC:5,SD:5.2,TN:4.7,TX:5.8,UT:6.2,VT:4.2,VA:4.5,WA:3.8,WV:4.2,WI:4.5,WY:5.5,DC:4.7};
   const OUTAGE_HRS = {AL:4.7,AK:5.5,AZ:1.5,AR:8.5,CA:4.7,CO:4.3,CT:2.6,DE:1.9,DC:.5,FL:22,GA:20.5,HI:5.3,ID:3.9,IL:2.6,IN:5.2,IA:2.8,KS:4.8,KY:10.8,LA:12.1,ME:29.1,MD:2,MA:1.7,MI:7.8,MN:3.7,MS:9.5,MO:3.7,MT:5.9,NE:10.7,NV:2.6,NH:15.4,NJ:2.9,NM:4.6,NY:3.7,NC:24,ND:1.7,OH:8.5,OK:4.5,OR:9.9,PA:5.6,RI:1.7,SC:52.3,SD:1.4,TN:4.6,TX:21.2,UT:2,VT:11.6,VA:7,WA:10.4,WV:19.4,WI:4.4,WY:2.3};
   const STATES = [["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["DC","Washington D.C."],["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],["IN","Indiana"],["IA","Iowa"],["KS","Kansas"],["KY","Kentucky"],["LA","Louisiana"],["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OK","Oklahoma"],["OR","Oregon"],["PA","Pennsylvania"],["RI","Rhode Island"],["SC","South Carolina"],["SD","South Dakota"],["TN","Tennessee"],["TX","Texas"],["UT","Utah"],["VT","Vermont"],["VA","Virginia"],["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"]];
   const PACKAGES = [
-    {name:"Starter", solar:400, battery:0},
-    {name:"Balcony Basic", solar:800, battery:0},
-    {name:"Balcony + Battery", solar:800, battery:1600},
-    {name:"Power Pack", solar:1600, battery:2000},
-    {name:"Max System", solar:3000, battery:4000}
+    {name:"580 W kit", solar:580},
+    {name:"1,180 W kit", solar:1180}
   ];
 
   function selfUseShare(w) {
@@ -396,7 +396,7 @@ details.more[open] > summary { margin-bottom: 18px; }
   }
 
   function typicalCost(solarW, batteryWh) {
-    return Math.round(solarW * PANEL_PER_W) + (batteryWh > 0 ? 0 : INVERTER) + Math.round(batteryWh * BATT_PER_WH);
+    return Math.round(BASE + solarW * PER_W) + Math.round(batteryWh * BATT_PER_WH);
   }
 
   function calc(i) {
@@ -436,8 +436,8 @@ details.more[open] > summary { margin-bottom: 18px; }
   window.solarCalc = calc; // handy for checking numbers in the console
 
   // ---------- State ----------
-  const DEFAULTS = { solar: 1200, battery: 0, state: "MA", rate: 33, psh: 4.7, growth: 5.9, useTou: true, tou: 14, customCost: 0 };
-  const KEY = "solar-payback-v1";
+  const DEFAULTS = { solar: 1180, battery: 0, state: "MA", rate: 33, psh: 4.7, growth: 5.9, useTou: true, tou: 14, customCost: 0 };
+  const KEY = "solar-payback-v2";
   let s = Object.assign({}, DEFAULTS);
   try { const saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved && typeof saved === "object") s = Object.assign(s, saved); } catch (e) {}
   function save() { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
@@ -452,12 +452,12 @@ details.more[open] > summary { margin-bottom: 18px; }
   PACKAGES.forEach((p, idx) => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "pkg"; b.id = "pkg" + idx;
-    const spec = p.solar.toLocaleString() + " W" + (p.battery ? " + " + p.battery.toLocaleString() + " Wh battery" : ", no battery");
+    const spec = "Solar panels only";
     b.innerHTML = '<span class="name"></span><span class="spec"></span><span class="price"></span>';
     b.querySelector(".name").textContent = p.name;
     b.querySelector(".spec").textContent = spec;
-    b.querySelector(".price").textContent = "about " + usd(typicalCost(p.solar, p.battery));
-    b.addEventListener("click", () => { s.solar = p.solar; s.battery = p.battery; s.customCost = 0; $("customCost").value = ""; sync(); });
+    b.querySelector(".price").textContent = usd(typicalCost(p.solar, 0));
+    b.addEventListener("click", () => { s.solar = p.solar; s.customCost = 0; $("customCost").value = ""; sync(); });
     pkgBox.appendChild(b);
   });
 
@@ -502,12 +502,12 @@ details.more[open] > summary { margin-bottom: 18px; }
     const stName = (STATES.find(x => x[0] === s.state) || [, ""])[1];
     $("stateHint").textContent = stName + " averages " + (PSH[s.state] || 4.5) + " peak sun hours a day.";
 
-    PACKAGES.forEach((p, idx) => $("pkg" + idx).setAttribute("aria-pressed", String(p.solar === s.solar && p.battery === s.battery)));
+    PACKAGES.forEach((p, idx) => $("pkg" + idx).setAttribute("aria-pressed", String(p.solar === s.solar)));
 
     const r = calc(s);
     const auto = typicalCost(s.solar, s.battery);
     $("costAuto").textContent = usd(auto);
-    $("costAutoText").textContent = s.customCost > 0 ? "Typical price (not used, your quote is)" : "Typical price for this setup";
+    $("costAutoText").textContent = s.customCost > 0 ? "Listed price (not used, your quote is)" : s.battery > 0 ? "Price with battery" : "Price for this setup";
 
     $("rSavings").innerHTML = usd(r.savings) + "<small>/yr</small>";
     $("rHeroSub").textContent = !isFinite(r.payback) ? "With these numbers it never pays for itself."
