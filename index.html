@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Solar Payback Calculator</title>
+<script>
+  // Compact mode for the slideshow: "Solar Calculator.html?embed=1" hides the page header and footer notes.
+  if (/[?&]embed=1/.test(location.search)) {
+    document.documentElement.classList.add("embed");
+    document.documentElement.setAttribute("data-theme", "light"); // match the light slides
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: two columns on desktop (controls left, sticky results right); one column on phones with a sticky savings bar at the bottom. */
+:root {
+  --bg: #F2F5F7;
+  --surface: #FFFFFF;
+  --ink: #13202B;
+  --muted: #5A6A77;
+  --line: #D9E1E7;
+  --sun: #E9A100;
+  --sun-ink: #7A5200;
+  --sun-soft: #FFF2CC;
+  --good: #1D7448;
+  --good-soft: #E1F2E8;
+  --bad: #B03F2C;
+  --font-display: "Bricolage Grotesque", "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E151B; --surface: #16212A; --ink: #E7EDF1; --muted: #93A3AF; --line: #2A3843;
+    --sun: #F4B731; --sun-ink: #F7CB66; --sun-soft: #3A2F10; --good: #52C48C; --good-soft: #143026; --bad: #EC8571;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E151B; --surface: #16212A; --ink: #E7EDF1; --muted: #93A3AF; --line: #2A3843;
+  --sun: #F4B731; --sun-ink: #F7CB66; --sun-soft: #3A2F10; --good: #52C48C; --good-soft: #143026; --bad: #EC8571;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+
+header h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  line-height: 1.1;
+  margin: 0 0 6px;
+  text-wrap: balance;
+}
+header p { margin: 0; color: var(--muted); max-width: 60ch; }
+
+h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.15rem;
+  margin: 0;
+}
+.step-label {
+  font-size: .75rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+}
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.controls { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+
+/* Packages */
+.packages { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.pkg {
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+  background: var(--bg); border: 2px solid transparent; border-radius: 12px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 2px;
+}
+.pkg:hover { border-color: var(--line); }
+.pkg:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+.pkg[aria-pressed="true"] { border-color: var(--sun); background: var(--sun-soft); }
+.pkg .name { font-weight: 600; }
+.pkg .spec { font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pkg .price { font-size: .85rem; font-weight: 600; color: var(--sun-ink); font-variant-numeric: tabular-nums; }
+
+/* Fields */
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.field label, .field .label { font-weight: 600; }
+.hint { font-size: .85rem; color: var(--muted); margin: 0; }
+.slider-row { display: flex; gap: 12px; align-items: center; }
+input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sun); height: 28px; cursor: pointer; }
+.num {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px;
+}
+.num:focus-within { outline: 3px solid var(--sun); outline-offset: 1px; }
+.num input {
+  width: 4.6em; border: 0; background: transparent; color: var(--ink);
+  font: inherit; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums;
+}
+.num input:focus { outline: none; }
+.num span { color: var(--muted); font-size: .9rem; }
+select {
+  font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%;
+}
+select:focus-visible { outline: 3px solid var(--sun); outline-offset: 1px; }
+
+.cost-box { display: flex; flex-direction: column; gap: 10px; }
+.cost-auto { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.cost-auto strong { font-family: var(--font-display); font-size: 1.5rem; }
+
+.toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; }
+.toggle input { width: 20px; height: 20px; accent-color: var(--sun); }
+
+details.more { border-top: 1px solid var(--line); padding-top: 16px; }
+details.more > summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+details.more > summary:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+details.more[open] > summary { margin-bottom: 18px; }
+.more-body { display: flex; flex-direction: column; gap: 20px; }
+
+/* Results */
+.results { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.hero-result { background: var(--ink); color: var(--bg); border: 0; }
+.hero-result .step-label { color: inherit; opacity: .75; }
+.big {
+  font-family: var(--font-display); font-weight: 800; line-height: 1;
+  font-size: clamp(3rem, 8vw, 4.2rem); font-variant-numeric: tabular-nums; margin: 4px 0;
+}
+.big small { font-size: .35em; font-weight: 600; opacity: .8; }
+.hero-sub { opacity: .85; margin: 0; }
+
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+.stat { background: var(--surface); padding: 14px; display: flex; flex-direction: column; gap: 2px; }
+.stat .v { font-family: var(--font-display); font-weight: 600; font-size: 1.45rem; font-variant-numeric: tabular-nums; }
+.stat .k { font-size: .85rem; color: var(--muted); }
+.v.pos { color: var(--good); }
+.v.neg { color: var(--bad); }
+
+.chart-wrap { display: flex; flex-direction: column; gap: 8px; }
+.chart-wrap svg { width: 100%; height: auto; display: block; }
+.chart-note { font-size: .85rem; color: var(--muted); margin: 0; }
+
+.resilience { font-size: .92rem; display: flex; flex-direction: column; gap: 6px; }
+.resilience p { margin: 0; }
+.pill {
+  display: inline-block; font-size: .78rem; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+  background: var(--good-soft); color: var(--good);
+}
+.pill.warn { background: var(--sun-soft); color: var(--sun-ink); }
+
+.btn {
+  font: inherit; font-weight: 600; cursor: pointer; color: var(--ink);
+  background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px;
+}
+.btn:hover { background: var(--bg); }
+.btn:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+
+.method { color: var(--muted); font-size: .9rem; }
+.method h2 { color: var(--ink); margin-bottom: 8px; }
+.method ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; max-width: 75ch; }
+.method p { max-width: 75ch; }
+
+/* Phone sticky bar */
+.mobile-bar {
+  display: none;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: var(--ink); color: var(--bg);
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  justify-content: space-between; align-items: center; gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.mobile-bar strong { font-family: var(--font-display); font-size: 1.35rem; }
+.mobile-bar a { color: inherit; font-weight: 600; font-size: .9rem; }
+@media (max-width: 900px) {
+  .mobile-bar { display: flex; }
+  body { padding-bottom: 96px; }
+  .results { position: static; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* Compact mode inside the slideshow */
+.embed body { padding-block: 16px; font-size: 15px; }
+.embed header, .embed .method, .embed .mobile-bar { display: none !important; }
+.embed .panel { padding: 16px; gap: 14px; }
+.embed .controls { gap: 16px; }
+.embed .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 400px); }
+.embed .results { position: static; }
+@media (max-width: 700px) { .embed .grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 900px) { .embed body { padding-bottom: 16px; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Solar Payback Calculator</h1>
+    <p>Pick a plug-in solar setup, enter what you pay for electricity, and see how much it saves and how long it takes to pay for itself.</p>
+  </header>
+
+  <div class="grid">
+    <div class="controls">
+
+      <section class="panel" aria-labelledby="h-setup">
+        <div>
+          <div class="step-label">Step 1</div>
+          <h2 id="h-setup">Choose a setup</h2>
+        </div>
+        <div class="packages" id="packages"></div>
+
+        <div class="field">
+          <div class="field-top">
+            <label for="solar">Solar panel size</label>
+            <div class="num"><input id="solarNum" type="number" inputmode="numeric" min="200" max="3000" step="50" aria-label="Solar panel size in watts"><span>W</span></div>
+          </div>
+          <div class="slider-row"><input id="solar" type="range" min="200" max="3000" step="50"></div>
+          <p class="hint">The total wattage printed on the panels. A typical balcony kit is 800 W.</p>
+        </div>
+
+        <div class="field">
+          <div class="field-top">
+            <label for="battery">Battery size</label>
+            <div class="num"><input id="batteryNum" type="number" inputmode="numeric" min="0" max="5000" step="100" aria-label="Battery size in watt-hours"><span>Wh</span></div>
+          </div>
+          <div class="slider-row"><input id="battery" type="range" min="0" max="5000" step="100"></div>
+          <p class="hint">Set to 0 if there's no battery. A battery stores daytime sun for evening use.</p>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-home">
+        <div>
+          <div class="step-label">Step 2</div>
+          <h2 id="h-home">Your home and electric bill</h2>
+        </div>
+
+        <div class="field">
+          <label for="state">State</label>
+          <select id="state"></select>
+          <p class="hint" id="stateHint">Sets how much sun you get.</p>
+        </div>
+
+        <div class="field">
+          <div class="field-top">
+            <label for="rate">What you pay for electricity</label>
+            <div class="num"><input id="rateNum" type="number" inputmode="decimal" min="5" max="60" step="0.5" aria-label="Electricity rate in cents per kilowatt-hour"><span>¢ per kWh</span></div>
+          </div>
+          <div class="slider-row"><input id="rate" type="range" min="5" max="60" step="0.5"></div>
+          <p class="hint">On your bill: add up all charges, then divide by the kWh you used. Example: $132 ÷ 400 kWh = 33¢.</p>
+        </div>
+
+        <div class="field cost-box">
+          <span class="label">What the system costs</span>
+          <div class="cost-auto"><span id="costAutoText">Typical price for this setup</span><strong id="costAuto">$0</strong></div>
+          <div class="field-top">
+            <label for="customCost" class="hint" style="font-weight:500">Have a real price quote? Type it here instead:</label>
+            <div class="num"><span>$</span><input id="customCost" type="number" inputmode="numeric" min="0" step="10" placeholder="—" aria-label="Your own system price in dollars"></div>
+          </div>
+        </div>
+
+        <details class="more" id="more">
+          <summary>Advanced settings (optional)</summary>
+          <div class="more-body">
+            <div class="field">
+              <div class="field-top">
+                <label for="psh">Peak sun hours per day</label>
+                <div class="num"><input id="pshNum" type="number" inputmode="decimal" min="2" max="8" step="0.1" aria-label="Peak sun hours per day"><span>hours</span></div>
+              </div>
+              <div class="slider-row"><input id="psh" type="range" min="2" max="8" step="0.1"></div>
+              <p class="hint">Filled in from your state. Change it only if you know your local number.</p>
+            </div>
+
+            <div class="field">
+              <div class="field-top">
+                <label for="growth">Yearly electricity price increase</label>
+                <div class="num"><input id="growthNum" type="number" inputmode="decimal" min="0" max="20" step="0.1" aria-label="Yearly electricity price increase in percent"><span>%</span></div>
+              </div>
+              <div class="slider-row"><input id="growth" type="range" min="0" max="20" step="0.1"></div>
+              <p class="hint">Used for the 10- and 25-year totals. The U.S. average from 2015 to 2025 was about 3.1%.</p>
+            </div>
+
+            <div class="field">
+              <label class="toggle"><input id="useTou" type="checkbox"> I'm on a time-of-use (TOU) rate plan</label>
+              <div class="field-top">
+                <label for="tou" class="hint" style="font-weight:500">Peak vs. off-peak price difference</label>
+                <div class="num"><input id="tou" type="number" inputmode="decimal" min="0" max="40" step="0.5" aria-label="Time-of-use price difference in cents"><span>¢</span></div>
+              </div>
+              <p class="hint">Without a battery, only about 30% of this difference counts toward savings.</p>
+            </div>
+
+            <div><button class="btn" id="reset" type="button">Reset everything</button></div>
+          </div>
+        </details>
+      </section>
+    </div>
+
+    <aside class="results" id="results" aria-live="polite">
+      <section class="panel hero-result">
+        <div class="step-label">Estimated savings</div>
+        <div class="big" id="rSavings">$0<small>/yr</small></div>
+        <p class="hero-sub" id="rHeroSub">Pays for itself in about — years.</p>
+      </section>
+
+      <section class="panel">
+        <div class="stats">
+          <div class="stat"><span class="v" id="rPayback">—</span><span class="k">Payback time</span></div>
+          <div class="stat"><span class="v" id="rCost">—</span><span class="k">System cost</span></div>
+          <div class="stat"><span class="v" id="r10">—</span><span class="k">Profit after 10 years</span></div>
+          <div class="stat"><span class="v" id="r25">—</span><span class="k">Profit after 25 years</span></div>
+          <div class="stat"><span class="v" id="rDaily">—</span><span class="k">Made per day</span></div>
+          <div class="stat"><span class="v" id="rSelf">—</span><span class="k">Used in your home</span></div>
+        </div>
+
+        <div class="chart-wrap">
+          <h2>Money in your pocket over time</h2>
+          <div id="chart"></div>
+          <p class="chart-note" id="chartNote"></p>
+        </div>
+
+        <div class="resilience" id="resilience"></div>
+      </section>
+    </aside>
+  </div>
+
+  <section class="panel method" aria-labelledby="h-method">
+    <div>
+      <h2 id="h-method">How the numbers are worked out</h2>
+      <ul>
+        <li><strong>Daily power made</strong> = panel size × sun hours × 0.8 (real panels lose about 20% to heat, wiring and angle).</li>
+        <li><strong>Used in your home</strong>: plug-in systems only save money on power you use as it's made. Small systems use almost all of it (98% at 200 W); bigger ones less (60% at 1,200 W, 30% at 3,000 W). A battery saves some of the leftover for later, up to 95% total.</li>
+        <li><strong>Yearly savings</strong> = power made per year × share used at home × your rate (plus the time-of-use bonus if it's on).</li>
+        <li><strong>Payback</strong> = system cost ÷ first-year savings.</li>
+        <li><strong>10- and 25-year profit</strong>: panels lose 0.5% of output per year, and electricity prices rise by the yearly increase you set, starting in year 2. Minus what the system cost.</li>
+        <li><strong>Typical price</strong> = $0.80 per watt of panels + $400 for the inverter, or + $0.75 per Wh of battery (battery systems include the inverter). No tax credit is applied.</li>
+        <li><strong>Backup value</strong> with a battery is an estimate of what riding out power outages is worth ($35 per outage hour covered). It's not bill savings, so it's shown separately.</li>
+      </ul>
+      <p>This is an estimate, not a quote. Battery replacement costs aren't included. Check your utility's and state's rules before installing. Formulas follow the calculator at pluginsolarus.com.</p>
+    </div>
+  </section>
+</div>
+
+<div class="mobile-bar" aria-hidden="true">
+  <div><strong id="mbSavings">$0/yr</strong> <span id="mbPayback"></span></div>
+  <a href="#results">See details</a>
+</div>
+
+<script>
+(function () {
+  // ---------- Model (matches pluginsolarus.com/calculator) ----------
+  const PANEL_PER_W = 0.80, BATT_PER_WH = 0.75, INVERTER = 400, EFFICIENCY = 0.80, DEGRADATION = 0.005;
+  const OUTAGE_VALUE_PER_HR = 35, BACKUP_LOAD_W = 500;
+  const SELF_USE = [[200,.98],[400,.95],[600,.85],[800,.75],[1200,.60],[1600,.50],[2000,.42],[2500,.36],[3000,.30]];
+  const PSH = {AL:5,AK:2.1,AZ:7.5,AR:5,CA:6.3,CO:6,CT:4.7,DE:4.7,FL:5.5,GA:5,HI:5.8,ID:5,IL:4.6,IN:4.2,IA:4.2,KS:5.7,KY:4.5,LA:5,ME:4.2,MD:4.7,MA:4.7,MI:4.2,MN:4.4,MS:5,MO:5,MT:5,NE:5.5,NV:6.8,NH:4.3,NJ:4.3,NM:6.8,NY:4.3,NC:5,ND:5,OH:4.2,OK:5.7,OR:5,PA:4.5,RI:4.7,SC:5,SD:5.2,TN:4.7,TX:5.8,UT:6.2,VT:4.2,VA:4.5,WA:3.8,WV:4.2,WI:4.5,WY:5.5,DC:4.7};
+  const OUTAGE_HRS = {AL:4.7,AK:5.5,AZ:1.5,AR:8.5,CA:4.7,CO:4.3,CT:2.6,DE:1.9,DC:.5,FL:22,GA:20.5,HI:5.3,ID:3.9,IL:2.6,IN:5.2,IA:2.8,KS:4.8,KY:10.8,LA:12.1,ME:29.1,MD:2,MA:1.7,MI:7.8,MN:3.7,MS:9.5,MO:3.7,MT:5.9,NE:10.7,NV:2.6,NH:15.4,NJ:2.9,NM:4.6,NY:3.7,NC:24,ND:1.7,OH:8.5,OK:4.5,OR:9.9,PA:5.6,RI:1.7,SC:52.3,SD:1.4,TN:4.6,TX:21.2,UT:2,VT:11.6,VA:7,WA:10.4,WV:19.4,WI:4.4,WY:2.3};
+  const STATES = [["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["DC","Washington D.C."],["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],["IN","Indiana"],["IA","Iowa"],["KS","Kansas"],["KY","Kentucky"],["LA","Louisiana"],["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OK","Oklahoma"],["OR","Oregon"],["PA","Pennsylvania"],["RI","Rhode Island"],["SC","South Carolina"],["SD","South Dakota"],["TN","Tennessee"],["TX","Texas"],["UT","Utah"],["VT","Vermont"],["VA","Virginia"],["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"]];
+  const PACKAGES = [
+    {name:"Starter", solar:400, battery:0},
+    {name:"Balcony Basic", solar:800, battery:0},
+    {name:"Balcony + Battery", solar:800, battery:1600},
+    {name:"Power Pack", solar:1600, battery:2000},
+    {name:"Max System", solar:3000, battery:4000}
+  ];
+
+  function selfUseShare(w) {
+    const first = SELF_USE[0], last = SELF_USE[SELF_USE.length - 1];
+    if (w <= first[0]) return first[1];
+    if (w >= last[0]) return last[1];
+    for (let i = 0; i < SELF_USE.length - 1; i++) {
+      const [w1, s1] = SELF_USE[i], [w2, s2] = SELF_USE[i + 1];
+      if (w >= w1 && w <= w2) return s1 + (w - w1) / (w2 - w1) * (s2 - s1);
+    }
+    return last[1];
+  }
+
+  function typicalCost(solarW, batteryWh) {
+    return Math.round(solarW * PANEL_PER_W) + (batteryWh > 0 ? 0 : INVERTER) + Math.round(batteryWh * BATT_PER_WH);
+  }
+
+  function calc(i) {
+    const cost = i.customCost > 0 ? i.customCost : typicalCost(i.solar, i.battery);
+    const daily = i.solar / 1000 * i.psh * EFFICIENCY;
+    const annual = daily * 365;
+    const base = selfUseShare(i.solar);
+    const extraWh = daily * (1 - base) * 1000;
+    const battBoost = i.battery > 0 && extraWh > 0 ? (1 - base) * Math.min(1, i.battery / extraWh) * 0.9 : 0;
+    const selfUse = Math.min(0.95, base + battBoost);
+    const rate = i.useTou ? (i.rate + i.tou * (i.battery > 0 ? 1 : 0.3)) / 100 : i.rate / 100;
+    const savings = annual * selfUse * rate;
+    const payback = savings > 0 ? cost / savings : Infinity;
+
+    const cumulative = [-cost];
+    let running = -cost, ten = -cost;
+    for (let y = 1; y <= 25; y++) {
+      const s = savings * Math.pow(1 - DEGRADATION, y - 1) * Math.pow(1 + i.growth / 100, y - 1);
+      running += s;
+      if (y <= 10) ten += s;
+      cumulative.push(running);
+    }
+
+    const outage = OUTAGE_HRS[i.state] || 5.5;
+    const backupHrs = i.battery > 0 ? i.battery * 0.8 / BACKUP_LOAD_W : 0;
+    const coveredHrs = i.battery > 0 ? Math.min(outage, backupHrs * (outage / Math.max(backupHrs, 1))) : 0;
+    const resilience = Math.round(coveredHrs * OUTAGE_VALUE_PER_HR);
+    const totalValue = Math.round(savings) + resilience;
+
+    return {
+      cost, daily, annual, monthly: annual / 12, selfUse, savings, payback,
+      ten, twentyFive: running, cumulative,
+      outage, backupHrs, resilience, totalValue,
+      adjPayback: totalValue > 0 ? cost / totalValue : Infinity
+    };
+  }
+  window.solarCalc = calc; // handy for checking numbers in the console
+
+  // ---------- State ----------
+  const DEFAULTS = { solar: 1200, battery: 0, state: "MA", rate: 33, psh: 4.7, growth: 5.9, useTou: true, tou: 14, customCost: 0 };
+  const KEY = "solar-payback-v1";
+  let s = Object.assign({}, DEFAULTS);
+  try { const saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved && typeof saved === "object") s = Object.assign(s, saved); } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+
+  const $ = id => document.getElementById(id);
+  const usd = n => "$" + Math.round(Math.abs(n)).toLocaleString("en-US");
+  const signed = n => (n < 0 ? "−" : "+") + usd(n);
+  const yrs = n => !isFinite(n) || n > 99 ? "Never" : n.toFixed(1) + " yrs";
+
+  // ---------- Build controls ----------
+  const pkgBox = $("packages");
+  PACKAGES.forEach((p, idx) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "pkg"; b.id = "pkg" + idx;
+    const spec = p.solar.toLocaleString() + " W" + (p.battery ? " + " + p.battery.toLocaleString() + " Wh battery" : ", no battery");
+    b.innerHTML = '<span class="name"></span><span class="spec"></span><span class="price"></span>';
+    b.querySelector(".name").textContent = p.name;
+    b.querySelector(".spec").textContent = spec;
+    b.querySelector(".price").textContent = "about " + usd(typicalCost(p.solar, p.battery));
+    b.addEventListener("click", () => { s.solar = p.solar; s.battery = p.battery; s.customCost = 0; $("customCost").value = ""; sync(); });
+    pkgBox.appendChild(b);
+  });
+
+  const sel = $("state");
+  STATES.forEach(([abbr, name]) => { const o = document.createElement("option"); o.value = abbr; o.textContent = name; sel.appendChild(o); });
+  sel.addEventListener("change", () => { s.state = sel.value; s.psh = PSH[s.state] || 4.5; sync(); });
+
+  function pair(rangeId, numId, key, min, max) {
+    const r = $(rangeId), n = $(numId);
+    r.addEventListener("input", () => { s[key] = +r.value; sync(rangeId); });
+    n.addEventListener("input", () => {
+      const v = parseFloat(n.value);
+      if (!isNaN(v)) { s[key] = Math.min(max, Math.max(min, v)); sync(numId); }
+    });
+    n.addEventListener("blur", () => sync());
+  }
+  pair("solar", "solarNum", "solar", 50, 3000);
+  pair("battery", "batteryNum", "battery", 0, 5000);
+  pair("rate", "rateNum", "rate", 1, 100);
+  pair("psh", "pshNum", "psh", 0.5, 10);
+  pair("growth", "growthNum", "growth", 0, 20);
+
+  $("useTou").addEventListener("change", e => { s.useTou = e.target.checked; sync(); });
+  $("tou").addEventListener("input", e => { const v = parseFloat(e.target.value); s.tou = isNaN(v) ? 0 : Math.max(0, v); sync("tou"); });
+  $("customCost").addEventListener("input", e => { const v = parseFloat(e.target.value); s.customCost = isNaN(v) || v <= 0 ? 0 : v; sync("customCost"); });
+  $("reset").addEventListener("click", () => { s = Object.assign({}, DEFAULTS); $("customCost").value = ""; sync(); });
+
+  // ---------- Render ----------
+  function setVal(id, v, skip) { if (id !== skip) $(id).value = v; }
+
+  function sync(skip) {
+    setVal("solar", s.solar, skip); setVal("solarNum", s.solar, skip);
+    setVal("battery", s.battery, skip); setVal("batteryNum", s.battery, skip);
+    setVal("rate", s.rate, skip); setVal("rateNum", s.rate, skip);
+    setVal("psh", s.psh, skip); setVal("pshNum", s.psh, skip);
+    setVal("growth", s.growth, skip); setVal("growthNum", s.growth, skip);
+    setVal("tou", s.tou, skip);
+    if (skip !== "customCost") $("customCost").value = s.customCost > 0 ? s.customCost : "";
+    sel.value = s.state;
+    $("useTou").checked = s.useTou;
+    $("tou").disabled = !s.useTou;
+    const stName = (STATES.find(x => x[0] === s.state) || [, ""])[1];
+    $("stateHint").textContent = stName + " averages " + (PSH[s.state] || 4.5) + " peak sun hours a day.";
+
+    PACKAGES.forEach((p, idx) => $("pkg" + idx).setAttribute("aria-pressed", String(p.solar === s.solar && p.battery === s.battery)));
+
+    const r = calc(s);
+    const auto = typicalCost(s.solar, s.battery);
+    $("costAuto").textContent = usd(auto);
+    $("costAutoText").textContent = s.customCost > 0 ? "Typical price (not used, your quote is)" : "Typical price for this setup";
+
+    $("rSavings").innerHTML = usd(r.savings) + "<small>/yr</small>";
+    $("rHeroSub").textContent = !isFinite(r.payback) ? "With these numbers it never pays for itself."
+      : r.payback > 25 ? "Takes about " + r.payback.toFixed(1) + " years to pay off, longer than the panels last."
+      : "Pays for itself in about " + r.payback.toFixed(1) + " years. That's about " + usd(r.savings / 12) + " a month.";
+    $("rPayback").textContent = yrs(r.payback);
+    $("rCost").textContent = usd(r.cost);
+    setSigned("r10", r.ten); setSigned("r25", r.twentyFive);
+    $("rDaily").textContent = r.daily.toFixed(1) + " kWh";
+    $("rSelf").textContent = Math.round(r.selfUse * 100) + "%";
+
+    $("mbSavings").textContent = usd(r.savings) + "/yr";
+    $("mbPayback").textContent = isFinite(r.payback) ? "· pays off in " + r.payback.toFixed(1) + " yrs" : "";
+
+    drawChart(r.cumulative);
+    renderResilience(r, stName);
+    save();
+  }
+
+  function setSigned(id, v) {
+    const el = $(id); el.textContent = signed(v);
+    el.classList.toggle("pos", v >= 0); el.classList.toggle("neg", v < 0);
+  }
+
+  function renderResilience(r, stName) {
+    const box = $("resilience");
+    if (s.battery <= 0) {
+      box.innerHTML = '<p><span class="pill warn">No backup power</span></p><p></p>';
+      box.lastChild.textContent = "Plug-in solar shuts off during a power outage for safety. Add a battery to keep a few essentials running. " + stName + " averages " + r.outage + " outage hours a year.";
+      return;
+    }
+    box.innerHTML = '<p><span class="pill"></span></p><p></p>';
+    box.querySelector(".pill").textContent = "Backup value: about " + usd(r.resilience) + "/yr";
+    box.lastChild.textContent = "The battery can run about 500 W of essentials (fridge, lights, phone charging) for roughly " + r.backupHrs.toFixed(1) + " hours. Counting that, total value is " + usd(r.totalValue) + "/yr and payback is " + yrs(r.adjPayback) + ". This isn't money off your bill.";
+  }
+
+  // ---------- Chart ----------
+  function niceStep(range) {
+    const raw = range / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / mag;
+    return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+  }
+  function drawChart(cum) {
+    const W = 380, H = 210, L = 52, R = 10, T = 12, B = 28;
+    const minV = Math.min(0, ...cum), maxV = Math.max(0, ...cum);
+    const step = niceStep((maxV - minV) || 1);
+    const lo = Math.floor(minV / step) * step, hi = Math.ceil(maxV / step) * step;
+    const x = y => L + (y / 25) * (W - L - R);
+    const yv = v => T + (hi - v) / (hi - lo) * (H - T - B);
+    const pts = cum.map((v, i) => x(i).toFixed(1) + "," + yv(v).toFixed(1));
+
+    let g = "";
+    for (let v = lo; v <= hi + 1e-6; v += step) {
+      const yy = yv(v).toFixed(1);
+      const lbl = (v < 0 ? "−$" : "$") + (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toLocaleString("en-US", {maximumFractionDigits: 1}) + "k" : Math.abs(v));
+      g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '" stroke="var(--line)" stroke-width="' + (v === 0 ? 1.5 : 1) + '"/>';
+      g += '<text x="' + (L - 6) + '" y="' + (+yy + 4) + '" text-anchor="end" font-size="11" fill="var(--muted)">' + lbl + '</text>';
+    }
+    [0, 5, 10, 15, 20, 25].forEach(y => {
+      g += '<text x="' + x(y).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" fill="var(--muted)">' + (y === 0 ? "Today" : "Yr " + y) + '</text>';
+    });
+
+    const zeroY = yv(0).toFixed(1);
+    const area = "M" + x(0) + "," + zeroY + " L" + pts.join(" L") + " L" + x(25) + "," + zeroY + " Z";
+
+    // break-even point (linear between years)
+    let be = null;
+    for (let i = 1; i < cum.length; i++) if (cum[i - 1] < 0 && cum[i] >= 0) { be = (i - 1) + (-cum[i - 1]) / (cum[i] - cum[i - 1]); break; }
+    let mark = "";
+    if (be !== null) {
+      mark = '<circle cx="' + x(be).toFixed(1) + '" cy="' + zeroY + '" r="5" fill="var(--sun)" stroke="var(--surface)" stroke-width="2"/>';
+    }
+    const endV = cum[cum.length - 1];
+    const end = '<circle cx="' + x(25) + '" cy="' + yv(endV).toFixed(1) + '" r="4" fill="' + (endV >= 0 ? "var(--good)" : "var(--bad)") + '"/>';
+
+    $("chart").innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Running total of savings minus system cost over 25 years">'
+      + g
+      + '<path d="' + area + '" fill="var(--good)" opacity="0.12"/>'
+      + '<polyline points="' + pts.join(" ") + '" fill="none" stroke="var(--good)" stroke-width="2.5" stroke-linejoin="round"/>'
+      + mark + end + '</svg>';
+
+    $("chartNote").textContent = be !== null
+      ? "Starts below zero (what you paid). The yellow dot is where savings have covered the cost, around year " + be.toFixed(1) + "."
+      : endV < 0 ? "Savings don't cover the cost within 25 years with these numbers."
+      : "Savings minus what you paid, year by year.";
+  }
+
+  sync();
+})();
+</script>
+</body>
+</html>
